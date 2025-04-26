@@ -146,6 +146,87 @@ describe('TicketsController', () => {
           ),
         );
       });
+
+      it('if there is an existing company with registrationAddressChange ticket, throw', async () => {
+        const company = await Company.create({ name: 'test' });
+        await User.create({
+          name: 'Test User',
+          role: UserRole.corporateSecretary,
+          companyId: company.id,
+        });
+
+        await controller.create({
+          companyId: company.id,
+          type: TicketType.registrationAddressChange,
+        });
+
+        await expect(
+          controller.create({
+            companyId: company.id,
+            type: TicketType.registrationAddressChange,
+          }),
+        ).rejects.toEqual(
+          new ConflictException(
+            'Duplication Error: existing ticket found for this company with this type Registration Address Change.',
+          ),
+        );
+      });
+
+      it('if create registrationAddressChange tickets for different companies, allow', async () => {
+        const company1 = await Company.create({ name: 'test1' });
+        await User.create({
+          name: 'Secretary 1',
+          role: UserRole.corporateSecretary,
+          companyId: company1.id,
+        });
+
+        const company2 = await Company.create({ name: 'test2' });
+        await User.create({
+          name: 'Secretary 2',
+          role: UserRole.corporateSecretary,
+          companyId: company2.id,
+        });
+
+        const ticket1 = await controller.create({
+          companyId: company1.id,
+          type: TicketType.registrationAddressChange,
+        });
+
+        const ticket2 = await controller.create({
+          companyId: company2.id,
+          type: TicketType.registrationAddressChange,
+        });
+
+        expect(ticket1.companyId).toBe(company1.id);
+        expect(ticket2.companyId).toBe(company2.id);
+      });
+
+      it('if different type of tickets created for same company, allow', async () => {
+        const company = await Company.create({ name: 'test' });
+        await User.create({
+          name: 'Secretary',
+          role: UserRole.corporateSecretary,
+          companyId: company.id,
+        });
+        await User.create({
+          name: 'Accountant',
+          role: UserRole.accountant,
+          companyId: company.id,
+        });
+
+        const ticket1 = await controller.create({
+          companyId: company.id,
+          type: TicketType.registrationAddressChange,
+        });
+
+        const ticket2 = await controller.create({
+          companyId: company.id,
+          type: TicketType.managementReport,
+        });
+
+        expect(ticket1.type).toBe(TicketType.registrationAddressChange);
+        expect(ticket2.type).toBe(TicketType.managementReport);
+      });
     });
   });
 });
