@@ -32,6 +32,55 @@ export class TicketsController {
   @Post()
   async create(@Body() newTicketDto: newTicketDto) {
     const { type, companyId } = newTicketDto;
+    
+    if (type === TicketType.strikeOff) {
+      // Find director(s)
+      const directors = await User.findAll({
+        where: { companyId, role: UserRole.director },
+        order: [['createdAt', 'DESC']],
+      });
+
+      if (!directors.length) {
+        throw new ConflictException(
+          'Cannot find director to create a strike off ticket',
+        );
+      }
+
+      if (directors.length > 1) {
+        throw new ConflictException(
+          'Multiple directors found. Cannot create a strike off ticket',
+        );
+      }
+
+      // Resolve all active tickets for this company
+      await Ticket.update(
+        { status: TicketStatus.resolved },
+        {
+          where: {
+            companyId,
+            status: TicketStatus.open,
+          },
+        },
+      );
+
+      // Create the strike off ticket
+      const ticket = await Ticket.create({
+        companyId,
+        assigneeId: directors[0].id,
+        category: TicketCategory.management,
+        type,
+        status: TicketStatus.open,
+      });
+
+      return {
+        id: ticket.id,
+        type: ticket.type,
+        assigneeId: ticket.assigneeId,
+        status: ticket.status,
+        category: ticket.category,
+        companyId: ticket.companyId,
+      };
+    }
 
     if (type === TicketType.registrationAddressChange) {
       const existingTicket = await Ticket.findOne({

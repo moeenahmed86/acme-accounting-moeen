@@ -5,10 +5,12 @@ import {
   TicketCategory,
   TicketStatus,
   TicketType,
+  Ticket
 } from '../../db/models/Ticket';
 import { User, UserRole } from '../../db/models/User';
 import { DbModule } from '../db.module';
 import { TicketsController } from './tickets.controller';
+import { Op } from 'sequelize';
 
 describe('TicketsController', () => {
   let controller: TicketsController;
@@ -291,5 +293,92 @@ describe('TicketsController', () => {
       });
 
     });
+
+    describe('strikeOff', () => {
+      it('creates strikeOff ticket and resolves existing tickets', async () => {
+        // Create a company and director
+        const company = await Company.create({ name: 'test' });
+        const director = await User.create({
+          name: 'Test Director',
+          role: UserRole.director,
+          companyId: company.id,
+        });
+
+        // Create some existing tickets
+        await Ticket.create({
+          companyId: company.id,
+          assigneeId: director.id,
+          category: TicketCategory.corporate,
+          type: TicketType.registrationAddressChange,
+          status: TicketStatus.open,
+        });
+
+        // Create strike off ticket
+        const strikeOffTicket = await controller.create({
+          companyId: company.id,
+          type: TicketType.strikeOff,
+        });
+
+        // Verify strike off ticket
+        expect(strikeOffTicket.category).toBe(TicketCategory.management);
+        expect(strikeOffTicket.assigneeId).toBe(director.id);
+        expect(strikeOffTicket.status).toBe(TicketStatus.open);
+
+        // Verify other tickets are resolved
+        const existingTickets = await Ticket.findAll({
+          where: {
+            companyId: company.id,
+            type: {
+              [Op.ne]: TicketType.strikeOff,
+            },
+          },
+        });
+
+        existingTickets.forEach(ticket => {
+          expect(ticket.status).toBe(TicketStatus.resolved);
+        });
+      });
+
+      it('throws error when multiple directors exist', async () => {
+        const company = await Company.create({ name: 'test' });
+        await User.create({
+          name: 'Director 1',
+          role: UserRole.director,
+          companyId: company.id,
+        });
+        await User.create({
+          name: 'Director 2',
+          role: UserRole.director,
+          companyId: company.id,
+        });
+
+        await expect(
+          controller.create({
+            companyId: company.id,
+            type: TicketType.strikeOff,
+          }),
+        ).rejects.toEqual(
+          new ConflictException(
+            'Multiple directors found. Cannot create a strike off ticket',
+          ),
+        );
+      });
+
+      it('throws error when no director exists', async () => {
+        const company = await Company.create({ name: 'test' });
+
+        await expect(
+          controller.create({
+            companyId: company.id,
+            type: TicketType.strikeOff,
+          }),
+        ).rejects.toEqual(
+          new ConflictException(
+            'Cannot find director to create a strike off ticket',
+          ),
+        );
+      });
+    });
+
   });
 });
