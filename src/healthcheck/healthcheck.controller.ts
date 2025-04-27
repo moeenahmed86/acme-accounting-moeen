@@ -5,7 +5,6 @@ import { User } from '../../db/models/User';
 export class HealthcheckController {
   @Get()
   async ping() {
-    await User.findAll();
     return {
       OK: true,
     };
