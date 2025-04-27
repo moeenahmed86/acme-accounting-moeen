@@ -1,16 +1,11 @@
 import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Company } from '../../db/models/Company';
-import {
-  TicketCategory,
-  TicketStatus,
-  TicketType,
-  Ticket
-} from '../../db/models/Ticket';
 import { User, UserRole } from '../../db/models/User';
 import { DbModule } from '../db.module';
 import { TicketsController } from './tickets.controller';
 import { Op } from 'sequelize';
+import { Ticket, TicketCategory, TicketStatus, TicketType } from '../../db/models/Ticket';
 
 describe('TicketsController', () => {
   let controller: TicketsController;
